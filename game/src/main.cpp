@@ -7,26 +7,51 @@ See documentation here: https://www.raylib.com/, and examples here: https://www.
 #include "raymath.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
+#include "game.h"
 
-const unsigned int TARGET_FPS = 50;
+const unsigned int TARGET_FPS = 50; // frames per second
+float dt = 1; // seconds per frame
 float time = 0;
-int main()
+float x = 500;
+float y = 500;
+float frequency = 1;
+float amplitude = 100;
+
+// Changes world state
+void update()
 {
-    InitWindow(1200, 800, "Physics-1");
-    SetTargetFPS(TARGET_FPS);
+        dt = 1.0f / TARGET_FPS;
+        time += dt;
 
-    while (!WindowShouldClose())
-    {
+        x = x + (-sin(time * frequency)) * frequency * amplitude * dt;
+        y = y + (cos(time * frequency)) * frequency * amplitude * dt;
+}
+
+// Displays the world
+void draw()
+{
         BeginDrawing();
-            ClearBackground(WHITE);
-            DrawText("Hello world!", 10, 10, 20, LIGHTGRAY);
+            ClearBackground(BLACK);
+            DrawText("Lucas Adda 101566961", 10, float(GetScreenHeight() - 25), 20, LIGHTGRAY);
+           
+            GuiSliderBar(Rectangle{ 60, 15, 1000, 10}, "Time", TextFormat("%.2f", time), &time, 0, 240);
+            DrawText(TextFormat("T: %.2f", time), GetScreenWidth() - 150, 10, 30, LIGHTGRAY);
 
-
-            time += 1;
-            GuiSliderBar(Rectangle{ 60, 5, 1000, 10 }, "Time", TextFormat("%.2f", time), &time, 0, 240);
-
+            DrawCircle(x, y, 70, RED);
+            DrawCircle(500 + cos(time * frequency) * amplitude, 500 + sin(time * frequency), 70, GREEN);
 
         EndDrawing();
+}
+
+int main()
+{
+    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005-Physics");
+    SetTargetFPS(TARGET_FPS);
+
+    while (!WindowShouldClose()) // Loops TARGET_FPS per second
+    {
+        update();
+        draw();
     }
 
     CloseWindow();
