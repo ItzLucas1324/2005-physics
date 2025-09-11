@@ -10,47 +10,38 @@ See documentation here: https://www.raylib.com/, and examples here: https://www.
 #include "game.h"
 
 const unsigned int TARGET_FPS = 50; // frames per second
-float dt = 1; // seconds per frame
-float time = 0;
-float x = 500;
-float y = 500;
-float frequency = 1;
-float amplitude = 100;
 
-// Changes world state
-void update()
-{
-        dt = 1.0f / TARGET_FPS;
-        time += dt;
-
-        x = x + (-sin(time * frequency)) * frequency * amplitude * dt;
-        y = y + (cos(time * frequency)) * frequency * amplitude * dt;
-}
+Vector2 launchPos;
+float launchAngle;
+float launchSpeed;
 
 // Displays the world
 void draw()
 {
         BeginDrawing();
-            ClearBackground(BLACK);
-            DrawText("Lucas Adda 101566961", 10, float(GetScreenHeight() - 25), 20, LIGHTGRAY);
-           
-            GuiSliderBar(Rectangle{ 60, 15, 1000, 10}, "Time", TextFormat("%.2f", time), &time, 0, 240);
-            DrawText(TextFormat("T: %.2f", time), GetScreenWidth() - 150, 10, 30, LIGHTGRAY);
+            ClearBackground(SKYBLUE);
 
-            DrawCircle(x, y, 70, RED);
-            DrawCircle(500 + cos(time * frequency) * amplitude, 500 + sin(time * frequency), 70, GREEN);
-
+            // Ground
+            DrawRectangle(0, 700, 1200, 100, GREEN);
+            // Text Box
+            DrawRectangle(40, 40, 180, 100, BLACK);
+            // Text (In the text box)
+            DrawText(TextFormat("Launch Position"), 42, 42, 30, WHITE);
+            DrawText(TextFormat("(%.0f, %.0f)", launchPos.x, launchPos.y), 42, 82, 30, WHITE);
+            // Start Position
+            launchPos = { 200.0f, 500.0f };
+            DrawCircleV(launchPos, 10, RED);
+            
         EndDrawing();
 }
 
 int main()
 {
-    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005-Physics");
+    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 2");
     SetTargetFPS(TARGET_FPS);
 
     while (!WindowShouldClose()) // Loops TARGET_FPS per second
     {
-        update();
         draw();
     }
 
