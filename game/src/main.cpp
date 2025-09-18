@@ -31,6 +31,7 @@ public:
     Vector2 launchStart; 
     Vector2 projectileVelo; 
 
+    // Projectile Specific Physics
     void update(float dt, Vector2 gravity)
     {
         launchStart += projectileVelo * dt;
@@ -62,9 +63,10 @@ void update()
     if (IsKeyDown(KEY_D))
         launchPos.x += lpmSpeed * dt;
 
-    // Spawn launch ball
+    // Spawn launch bird
     if (IsKeyPressed(KEY_SPACE))
     {
+        // Creates and allocates memory for a new bird
         PhysicsBody newBird;
         newBird.launchStart = launchPos;
         newBird.projectileVelo = { launchSpeed * cosf(rad), -launchSpeed * sinf(rad) };
@@ -116,7 +118,6 @@ void draw()
             {
                 bird[i].draw();
             }
-
 
         EndDrawing();
 }
