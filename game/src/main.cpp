@@ -9,11 +9,19 @@ See documentation here: https://www.raylib.com/, and examples here: https://www.
 #include "raygui.h"
 #include "game.h"
 
-const unsigned int TARGET_FPS = 50; // frames per second
+const unsigned int TARGET_FPS = 60; // frames per second
 
 Vector2 launchPos;
 float launchAngle;
 float launchSpeed;
+float dt = 1; // seconds per frame
+float time = 0;
+
+void update()
+{
+    dt = 1.0f / TARGET_FPS;
+    time += dt;
+}
 
 // Displays the world
 void draw()
@@ -21,6 +29,9 @@ void draw()
         BeginDrawing();
             ClearBackground(SKYBLUE);
 
+            // Variable Adjustment Sliders
+            GuiSliderBar(Rectangle{ 10, 150, 700, 20 }, "", TextFormat("Angle: %.2f", launchAngle), &launchAngle, 0, 180);
+            GuiSliderBar(Rectangle{ 10, 190, 700, 20 }, "", TextFormat("Speed: %.2f", launchSpeed), &launchSpeed, 0, 500);
             // Ground
             DrawRectangle(0, 700, 1200, 100, GREEN);
             // Text Box
@@ -31,7 +42,7 @@ void draw()
             float rad = launchAngle * DEG2RAD;
             Vector2 velocity = { launchSpeed * cosf(rad), -launchSpeed * sinf(rad) };
             // Creating Line
-            DrawLineEx(launchPos, Vector2{ launchPos.x + velocity.x, launchPos.y + velocity.y }, 7, RED);
+            DrawLineEx(launchPos, Vector2{ launchPos + velocity }, 7, RED);
             // Text (In the text box)
             DrawText("Launch Position", 42, 42, 30, WHITE);
             DrawText(TextFormat("(%.0f, %.0f)", launchPos.x, launchPos.y), 42, 82, 30, WHITE);
@@ -57,6 +68,7 @@ int main()
     while (!WindowShouldClose()) // Loops TARGET_FPS per second
     {
         draw();
+        update();
     }
 
     CloseWindow();
