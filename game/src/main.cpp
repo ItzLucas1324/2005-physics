@@ -14,6 +14,7 @@ const unsigned int TARGET_FPS = 60; // frames per second
 Vector2 launchPos;
 float launchAngle;
 float launchSpeed;
+float lpmSpeed = 80;
 float dt = 1; // seconds per frame
 float time = 0;
 
@@ -21,6 +22,16 @@ void update()
 {
     dt = 1.0f / TARGET_FPS;
     time += dt;
+
+    // Start Position Movement
+    if (IsKeyDown(KEY_W))
+        launchPos.y -= lpmSpeed * dt;
+    if (IsKeyDown(KEY_S))
+        launchPos.y += lpmSpeed * dt;
+    if (IsKeyDown(KEY_A))
+        launchPos.x -= lpmSpeed * dt;
+    if (IsKeyDown(KEY_D))
+        launchPos.x += lpmSpeed * dt;
 }
 
 // Displays the world
