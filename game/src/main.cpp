@@ -90,7 +90,7 @@ void draw()
             // Variable Adjustment Sliders
             GuiSliderBar(Rectangle{ 10, 150, 700, 20 }, "", TextFormat("Angle: %.2f", launchAngle), &launchAngle, 0, 180);
             GuiSliderBar(Rectangle{ 10, 190, 700, 20 }, "", TextFormat("Speed: %.2f", launchSpeed), &launchSpeed, 0, 500);
-            GuiSliderBar(Rectangle{ 10, 230, 700, 20 }, "", TextFormat("Gravity: %.2f", gravityAcceleration.y), &gravityAcceleration.y, -350, 350);
+            GuiSliderBar(Rectangle{ 10, 230, 700, 20 }, "", TextFormat("Gravity: %.2f", gravityAcceleration.y), &gravityAcceleration.y, -350, 700);
             // Ground
             DrawRectangle(0, 700, 1200, 100, GREEN);
             // Text Box
@@ -124,7 +124,7 @@ void draw()
 
 int main()
 {
-    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 2");
+    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 3");
     SetTargetFPS(TARGET_FPS);
 
     launchPos = { 200.0f, 700.0f };
