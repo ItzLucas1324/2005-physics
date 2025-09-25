@@ -47,6 +47,18 @@ public:
 
 std::vector<PhysicsBody> bird;
 
+void cleanup()
+{
+    for (int i = 0; i < bird.size(); i++)
+    {
+        if (bird[i].launchStart.y > GetScreenHeight())
+        {
+            bird.erase(bird.begin() + i);
+            i--;
+        }
+    }
+}
+
 void update()
 {
     dt = 1.0f / TARGET_FPS;
@@ -69,10 +81,12 @@ void update()
         // Creates and allocates memory for a new bird
         PhysicsBody newBird;
         newBird.launchStart = launchPos;
-        newBird.projectileVelo = { launchSpeed * cosf(rad), -launchSpeed * sinf(rad) };
+        newBird.projectileVelo = velocity;
         bird.push_back(newBird); 
         // Adds a new bird to the list
     }
+
+    cleanup();
 
     // Adds physics to all angry birds created
     for (int i = 0; i < bird.size(); i++)
@@ -102,6 +116,8 @@ void draw()
             velocity = { launchSpeed * cosf(rad), -launchSpeed * sinf(rad) };
             // Creating Line
             DrawLineEx(launchPos, Vector2{ launchPos + velocity }, 7, RED);
+
+            DrawText(TextFormat("Objects: %i", bird.size()), 10, 270, 30, WHITE);
             // Text (In the text box)
             DrawText("Launch Position", 32, 42, 30, WHITE);
             DrawText(TextFormat("(%.0f, %.0f)", launchPos.x, launchPos.y), 32, 82, 30, WHITE);
