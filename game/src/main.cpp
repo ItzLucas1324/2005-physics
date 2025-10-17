@@ -101,6 +101,14 @@ public:
         DrawLineEx(position, position + normal * 30, 1, RED);
 
         Vector2 parallelToSurface = Vector2Rotate(normal, PI * 0.5f);
+
+        for (int i = 0; i < 40; i++) 
+        {
+            float offset = i * 50 + 25;
+            Vector2 oppositeVec = normal * -offset;
+            DrawLineEx(position - parallelToSurface * 2000 + oppositeVec, position + parallelToSurface * 2000 + oppositeVec, 50, DARKGREEN);
+        }
+
         DrawLineEx(position - parallelToSurface * 2000, position + parallelToSurface * 2000, 1, RED);
     }
 
@@ -116,24 +124,28 @@ PhysicsHalfspace halfspace;
 bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace) 
 {
     Vector2 displacementToCircle = circle->position - halfspace->position;
-    // Let d be the Dot Product of this displacement and the normal vector
-    // If D < 0, cricle is behind it and overlapping, if D > 0, circle is in front
-    // In other words... return (D < radius)
-    // return (Dot (displacement, normal) < radius)
 
     float dot = Vector2DotProduct(displacementToCircle, halfspace->getNormal());
     Vector2 vectorProjection = halfspace->getNormal() * dot;
 
-    DrawLineEx(circle->position, halfspace->position, 1, GRAY);
+    DrawLineEx(circle->position, circle->position - vectorProjection, 1, GRAY);
 
-    return false;
+    Vector2 midpoint = circle->position - vectorProjection * 0.5f;
+    DrawText(TextFormat("D: %3.0f", dot), midpoint.x, midpoint.y, 30, GRAY);
+
+    if (dot < circle->radius)
+    {
+        return true;
+    }
+    else
+        return false;
 }
 
-bool CircleOverlap(PhysicsCircle circleA, PhysicsCircle circleB)
+bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
 {
-    Vector2 displacement = circleB.position - circleA.position;
+    Vector2 displacement = circleB->position - circleA->position;
     float distance = Vector2Length(displacement);
-    float sumOfRadii = circleA.radius + circleB.radius;
+    float sumOfRadii = circleA->radius + circleB->radius;
     if (sumOfRadii > distance)
     {
         return true; // Overlapping
@@ -146,20 +158,38 @@ void checkCollisions()
 {
     for (int i = 0; i < objects.size(); i++) // Resets all circles to green if not touching
     {
-        ((PhysicsCircle*)objects[i])->color = GREEN;
+        objects[i]->color = GREEN;
     }
 
     for (int i = 0; i < objects.size(); i++) // Overlap check
     {
         for (int j = i + 1; j < objects.size(); j++)
         {
-            PhysicsCircle* circlePointerA = (PhysicsCircle*)objects[i];
-            PhysicsCircle* circlePointerB = (PhysicsCircle*)objects[j];
+            PhysicsBody* objectPointerA = objects[i];
+            PhysicsBody* objectPointerB = objects[j];
 
-            if (CircleOverlap(*circlePointerA, *circlePointerB))
+            PhysicsShape shapeOfA = objectPointerA->Shape();
+            PhysicsShape shapeOfB = objectPointerB->Shape();
+
+            bool didOverlap = false;
+
+            if (shapeOfA == CIRCLE && shapeOfB == CIRCLE)
             {
-                circlePointerA->color = RED;
-                circlePointerB->color = RED;
+                didOverlap = (CircleOverlap((PhysicsCircle*)objectPointerA, (PhysicsCircle*)objectPointerB));
+            }
+            else if (shapeOfA == CIRCLE && shapeOfB == HALF_SPACE)
+            {
+                didOverlap = (HalfspaceOverlap((PhysicsCircle*)objectPointerA, (PhysicsHalfspace*)objectPointerB));
+            }
+            else if (shapeOfA == HALF_SPACE && shapeOfB == CIRCLE)
+            {
+                didOverlap = (HalfspaceOverlap((PhysicsCircle*)objectPointerB, (PhysicsHalfspace*)objectPointerA));
+            }
+
+            if (didOverlap)
+            {
+                objectPointerA->color = RED;
+                objectPointerB->color = RED;
             }
         }
     }
@@ -227,13 +257,14 @@ void draw()
             GuiSliderBar(Rectangle{ 10, 150, 700, 20 }, "", TextFormat("Angle: %.2f", launchAngle), &launchAngle, 0, 180);
             GuiSliderBar(Rectangle{ 10, 190, 700, 20 }, "", TextFormat("Speed: %.2f", launchSpeed), &launchSpeed, 0, 500);
             GuiSliderBar(Rectangle{ 10, 230, 700, 20 }, "", TextFormat("Gravity: %.2f", gravityAcceleration.y), &gravityAcceleration.y, -350, 700);
+            // Halfspace Sliders
             GuiSliderBar(Rectangle{ 80, 270, 700, 20 }, "Halfspace X", TextFormat("%.0f", halfspace.position.x), &halfspace.position.x, 0, GetScreenWidth());
             GuiSliderBar(Rectangle{ 80, 310, 700, 20 }, "Halfspace y", TextFormat("%.0f", halfspace.position.y), &halfspace.position.y, 0, GetScreenHeight());
             float halfspaceRotation = halfspace.getRotation();
             GuiSliderBar(Rectangle{ 110, 350, 500, 20 }, "Halfspace Rotate", TextFormat("%.0f", halfspaceRotation), &halfspaceRotation, -360, 360);
             halfspace.setRotationDegrees(halfspaceRotation);
-            // Ground
-            DrawRectangle(0, 700, 1200, 100, DARKGREEN);
+            // Ground (May be adding it back later)
+            //DrawRectangle(0, 700, 1200, 100, DARKGREEN);
             // Text Box
             DrawRectangle(10, 30, 280, 100, BLACK);
             DrawRectangle(310, 30, 280, 100, BLACK);
@@ -244,7 +275,7 @@ void draw()
             // Creating Line
             DrawLineEx(launchPos, Vector2{ launchPos + velocity }, 7, RED);
             // Number of Birds Spawned Text
-            DrawText(TextFormat("Objects: %i", objects.size()), 10, 500, 30, WHITE);
+            DrawText(TextFormat("Projectiles: %i", objects.size() - 1), 10, 390, 30, WHITE);
             // Text (In the text box)
             DrawText("Launch Position", 32, 42, 30, WHITE);
             DrawText(TextFormat("(%.0f, %.0f)", launchPos.x, launchPos.y), 32, 82, 30, WHITE);
@@ -256,7 +287,7 @@ void draw()
             DrawText(TextFormat("(%.1f)", gravityAcceleration.y), 925, 82, 30, WHITE);
             // Start Position
             DrawCircleV(launchPos, 10, RED);
-            // Draws each bird in list
+            // Draws each circle in list
             for (int i = 0; i < objects.size(); i++)
             {
                 objects[i]->draw();
