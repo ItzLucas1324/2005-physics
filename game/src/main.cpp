@@ -146,12 +146,22 @@ bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
     Vector2 displacement = circleB->position - circleA->position;
     float distance = Vector2Length(displacement);
     float sumOfRadii = circleA->radius + circleB->radius;
+
+    float overlap = sumOfRadii - distance;
+    Vector2 normaltAtoB = displacement / distance;
+    Vector2 mtv = normaltAtoB * overlap; // minimum translation vector. Shortest distance/direction needed to move circles
+
     if (sumOfRadii > distance)
     {
+        circleA->position -= mtv * 0.5;
+        circleB->position += mtv * 0.5;
         return true; // Overlapping
     }
     else
         return false; // Not overlapping
+
+    // Overlapping = circleA.radius + circleB.radius - distance
+    // normalize displacement vector and multiply it by overlapping distance
 }
 
 void checkCollisions()
@@ -230,10 +240,10 @@ void update()
     if (IsKeyPressed(KEY_SPACE))
     {
         // Creates and allocates memory for a new bird
-        PhysicsCircle* newBird = new PhysicsCircle();
-        newBird->position = launchPos;
-        newBird->projectileVelo = velocity;
-        objects.push_back(newBird); 
+        PhysicsCircle* newCircle = new PhysicsCircle();
+        newCircle->position = launchPos;
+        newCircle->projectileVelo = velocity;
+        objects.push_back(newCircle); 
         // Adds a new bird to the list
     }
 
