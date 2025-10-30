@@ -156,7 +156,17 @@ bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
    
     if (overlapCircle > 0)
     {
-        Vector2 normaltAtoB = displacement / distance;
+        Vector2 normaltAtoB;
+        if (abs(distance) < 0.001f)
+        {
+            normaltAtoB = { 0, 1 };
+        }
+        else
+        {
+            normaltAtoB = displacement / distance;
+        }
+        
+        normaltAtoB = displacement / distance;
         Vector2 mtv = normaltAtoB * overlapCircle; // minimum translation vector. Shortest distance/direction needed to move circles
 
         circleA->position -= mtv * 0.5;
