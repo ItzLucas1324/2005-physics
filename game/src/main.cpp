@@ -120,6 +120,7 @@ public:
 
 std::vector<PhysicsBody*> objects;
 PhysicsHalfspace halfspace;
+PhysicsHalfspace halfspace2;
 
 bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace) 
 {
@@ -133,8 +134,12 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
     Vector2 midpoint = circle->position - vectorProjection * 0.5f;
     DrawText(TextFormat("D: %3.0f", dot), midpoint.x, midpoint.y, 30, GRAY);
 
-    if (dot < circle->radius)
+    float overlapHalfspace = circle->radius - dot;
+
+    if (overlapHalfspace > 0)
     {
+        Vector2 mtv = halfspace->getNormal() * overlapHalfspace;
+        circle->position += mtv;
         return true;
     }
     else
@@ -147,12 +152,13 @@ bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
     float distance = Vector2Length(displacement);
     float sumOfRadii = circleA->radius + circleB->radius;
 
-    float overlap = sumOfRadii - distance;
-    Vector2 normaltAtoB = displacement / distance;
-    Vector2 mtv = normaltAtoB * overlap; // minimum translation vector. Shortest distance/direction needed to move circles
-
-    if (sumOfRadii > distance)
+    float overlapCircle = sumOfRadii - distance;
+   
+    if (overlapCircle > 0)
     {
+        Vector2 normaltAtoB = displacement / distance;
+        Vector2 mtv = normaltAtoB * overlapCircle; // minimum translation vector. Shortest distance/direction needed to move circles
+
         circleA->position -= mtv * 0.5;
         circleB->position += mtv * 0.5;
         return true; // Overlapping
@@ -271,7 +277,7 @@ void draw()
             GuiSliderBar(Rectangle{ 80, 270, 700, 20 }, "Halfspace X", TextFormat("%.0f", halfspace.position.x), &halfspace.position.x, 0, GetScreenWidth());
             GuiSliderBar(Rectangle{ 80, 310, 700, 20 }, "Halfspace y", TextFormat("%.0f", halfspace.position.y), &halfspace.position.y, 0, GetScreenHeight());
             float halfspaceRotation = halfspace.getRotation();
-            GuiSliderBar(Rectangle{ 110, 350, 500, 20 }, "Halfspace Rotate", TextFormat("%.0f", halfspaceRotation), &halfspaceRotation, -360, 360);
+            GuiSliderBar(Rectangle{ 110, 350, 500, 20 }, "Halfspace Rotate", TextFormat("%.0f", halfspaceRotation), &halfspaceRotation, -180, 180);
             halfspace.setRotationDegrees(halfspaceRotation);
             // Ground (May be adding it back later)
             //DrawRectangle(0, 700, 1200, 100, DARKGREEN);
@@ -311,8 +317,12 @@ int main()
     InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 5");
     SetTargetFPS(TARGET_FPS);
     halfspace.isStatic = true;
+    halfspace2.isStatic = true;
     halfspace.position = { 500, 700 };
+    halfspace2.position = { 700, 750 };
     objects.push_back(&halfspace);
+    objects.push_back(&halfspace2);
+    halfspace2.setRotationDegrees(15);
 
     launchPos = { 200.0f, 700.0f };
     launchAngle = 50.0f;
