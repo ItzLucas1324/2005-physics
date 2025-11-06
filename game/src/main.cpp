@@ -129,10 +129,9 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
     float dot = Vector2DotProduct(displacementToCircle, halfspace->getNormal());
     Vector2 vectorProjection = halfspace->getNormal() * dot;
 
-    DrawLineEx(circle->position, circle->position - vectorProjection, 1, GRAY);
-
-    Vector2 midpoint = circle->position - vectorProjection * 0.5f;
-    DrawText(TextFormat("D: %3.0f", dot), midpoint.x, midpoint.y, 30, GRAY);
+    //DrawLineEx(circle->position, circle->position - vectorProjection, 1, GRAY);
+    //Vector2 midpoint = circle->position - vectorProjection * 0.5f;
+    //DrawText(TextFormat("D: %3.0f", dot), midpoint.x, midpoint.y, 30, GRAY);
 
     float overlapHalfspace = circle->radius - dot;
 
@@ -324,7 +323,7 @@ void draw()
 
 int main()
 {
-    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 5");
+    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 9");
     SetTargetFPS(TARGET_FPS);
     halfspace.isStatic = true;
     halfspace2.isStatic = true;
