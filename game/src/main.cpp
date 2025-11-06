@@ -318,6 +318,23 @@ void draw()
                 objects[i]->draw();
             }
 
+            // Draw Free Body Diagram
+            Vector2 location = { 500, 500 };
+            DrawCircleLines(location.x, location.y, 100, WHITE);
+            float mass = 8;
+            // Draw Gravity
+            Vector2 FGravity = gravityAcceleration * mass;
+            DrawLine(location.x, location.y, location.x + FGravity.x, location.y + FGravity.y, PURPLE);
+            // Draw Normal Force
+            Vector2 FgPerp = halfspace.getNormal() * Vector2DotProduct(FGravity, halfspace.getNormal());
+            Vector2 FNormal = FgPerp * -1;
+            DrawLine(location.x, location.y, location.x + FNormal.x, location.y + FNormal.y, GREEN);
+            // Draw Friction
+            Vector2 FgPara = FGravity - FgPerp;
+            Vector2 Ffriction = FgPara * -1;
+            DrawLine(location.x, location.y, location.x + Ffriction.x, location.y + Ffriction.y, ORANGE);
+
+
         EndDrawing();
 }
 
