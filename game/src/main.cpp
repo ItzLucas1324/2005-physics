@@ -15,6 +15,7 @@ const unsigned int TARGET_FPS = 60; // frames per second
 float lpmSpeed = 100;
 float dt = 1; // seconds per frame
 float time = 0;
+float coefficientOfFriction = 0.5f;
 
 Vector2 launchPos;
 
@@ -36,8 +37,10 @@ class PhysicsBody
 public:
     bool isStatic = false; // If this is set to true, don't move the object according to velocity or gravity
     Vector2 position {};
-    Vector2 projectileVelo {};
+    Vector2 projectileVelo {}; // Pixels per sec
     Color color = GREEN;
+    Vector2 netForce = {}; // in Newtons
+    float mass = 1;
 
     // Projectile Specific Physics
     void update(float dt, Vector2 gravity)
@@ -102,13 +105,13 @@ public:
 
         Vector2 parallelToSurface = Vector2Rotate(normal, PI * 0.5f);
 
-        for (int i = 0; i < 40; i++) 
-        {
-            float offset = i * 50 + 25;
-            Vector2 oppositeVec = normal * -offset;
-            DrawLineEx(position - parallelToSurface * 2000 + oppositeVec, position + parallelToSurface * 2000 + oppositeVec, 50, DARKGREEN);
-        }
-
+        //for (int i = 0; i < 40; i++) 
+        //{
+        //    float offset = i * 50 + 25;
+        //    Vector2 oppositeVec = normal * -offset;
+        //    DrawLineEx(position - parallelToSurface * 2000 + oppositeVec, position + parallelToSurface * 2000 + oppositeVec, 50, DARKGREEN);
+        //}
+        
         DrawLineEx(position - parallelToSurface * 2000, position + parallelToSurface * 2000, 1, RED);
     }
 
@@ -139,6 +142,29 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
     {
         Vector2 mtv = halfspace->getNormal() * overlapHalfspace;
         circle->position += mtv;
+
+        // Get Gravity
+        Vector2 FGravity = gravityAcceleration * circle->mass;
+
+        // Apply Normal Force
+        Vector2 FgPerp = halfspace->getNormal() * Vector2DotProduct(FGravity, halfspace->getNormal());
+        Vector2 FNormal = FgPerp * -1;
+        circle->netForce += FNormal;
+        DrawLineEx(circle->position, circle->position + FNormal, 2, GREEN);
+
+        // Friction
+        // F = uN where u is coefficient of friction between two surfaces
+        float u = coefficientOfFriction;
+        float frictionMagnitude = Vector2Length(FNormal) * u;
+
+        Vector2 FgPara = FGravity - FgPerp;
+        Vector2 frictionDirection = Vector2Normalize(FgPara) * -1;
+
+        Vector2 Ffriction = frictionDirection * frictionMagnitude;
+
+        circle->netForce += Ffriction;
+        DrawLineEx(circle->position, circle->position + Ffriction, 2, PINK);
+
         return true;
     }
     else
@@ -235,6 +261,47 @@ void cleanup()
     }
 }
 
+void addGravityForce()
+{
+    // Adds physics to all angry birds created
+    for (int i = 0; i < objects.size(); i++)
+    {
+        objects[i]->update(dt, gravityAcceleration);
+
+        if (objects[i]->isStatic) continue;
+
+        Vector2 FGravity = gravityAcceleration * objects[i]->mass; // F = ma therefore Fg = object mass * accleration due to gravity
+        objects[i]->netForce += FGravity;
+    }
+}
+
+void resetNetForces()
+{
+    for (int i = 0; i < objects.size(); i++)
+    {
+        objects[i]->netForce = { 0, 0 };
+    }
+}
+
+void addKinematics()
+{
+    // Adds physics to all angry birds created
+    for (int i = 0; i < objects.size(); i++)
+    {
+        if (objects[i]->isStatic) continue;
+
+        objects[i]->position = objects[i]->position + objects[i]->projectileVelo * dt;
+
+        Vector2 acceleration = objects[i]->netForce / objects[i]->mass;
+
+        objects[i]->projectileVelo = objects[i]->projectileVelo + acceleration * dt;
+
+        // Drawing netforces
+
+        DrawLineEx(objects[i]->position, objects[i]->position + objects[i]->netForce, 3, PINK);
+    }
+}
+
 void update()
 {
     dt = 1.0f / TARGET_FPS;
@@ -262,14 +329,15 @@ void update()
         // Adds a new bird to the list
     }
 
-    cleanup();
-    // Adds physics to all angry birds created
-    for (int i = 0; i < objects.size(); i++)
-    {
-        objects[i]->update(dt, gravityAcceleration);
-    }
+    resetNetForces();
+
+    addGravityForce();
 
     checkCollisions();
+
+    addKinematics();
+
+    cleanup();
 }
 
 // Displays the world
@@ -288,6 +356,9 @@ void draw()
             float halfspaceRotation = halfspace.getRotation();
             GuiSliderBar(Rectangle{ 110, 350, 500, 20 }, "Halfspace Rotate", TextFormat("%.0f", halfspaceRotation), &halfspaceRotation, -180, 180);
             halfspace.setRotationDegrees(halfspaceRotation);
+            //Friction Control
+            GuiSliderBar(Rectangle{ 110, 390, 500, 20 }, "Friction Control", TextFormat("%.0f", coefficientOfFriction), &coefficientOfFriction, 0, 1);
+
             // Ground (May be adding it back later)
             //DrawRectangle(0, 700, 1200, 100, DARKGREEN);
             // Text Box
@@ -319,21 +390,20 @@ void draw()
             }
 
             // Draw Free Body Diagram
-            Vector2 location = { 500, 500 };
-            DrawCircleLines(location.x, location.y, 100, WHITE);
-            float mass = 8;
-            // Draw Gravity
-            Vector2 FGravity = gravityAcceleration * mass;
-            DrawLine(location.x, location.y, location.x + FGravity.x, location.y + FGravity.y, PURPLE);
-            // Draw Normal Force
-            Vector2 FgPerp = halfspace.getNormal() * Vector2DotProduct(FGravity, halfspace.getNormal());
-            Vector2 FNormal = FgPerp * -1;
-            DrawLine(location.x, location.y, location.x + FNormal.x, location.y + FNormal.y, GREEN);
-            // Draw Friction
-            Vector2 FgPara = FGravity - FgPerp;
-            Vector2 Ffriction = FgPara * -1;
-            DrawLine(location.x, location.y, location.x + Ffriction.x, location.y + Ffriction.y, ORANGE);
-
+            //Vector2 location = { (InitialWidth / 2), (InitialHeight / 2)};
+            //DrawCircleLines(location.x, location.y, 100, WHITE);
+            //float mass = 8;
+            //// Draw Gravity
+            //Vector2 FGravity = gravityAcceleration * mass;
+            //DrawLineEx(location, location + FGravity, 3, PURPLE);
+            //// Draw Normal Force
+            //Vector2 FgPerp = halfspace.getNormal() * Vector2DotProduct(FGravity, halfspace.getNormal());
+            //Vector2 FNormal = FgPerp * -1;
+            //DrawLineEx(location, location + FNormal, 3, GREEN);
+            //// Draw Friction
+            //Vector2 FgPara = FGravity - FgPerp;
+            //Vector2 Ffriction = FgPara * -1;
+            //DrawLineEx(location, location + Ffriction, 3, ORANGE);
 
         EndDrawing();
 }
