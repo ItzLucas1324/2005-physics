@@ -15,11 +15,10 @@ const unsigned int TARGET_FPS = 60; // frames per second
 float lpmSpeed = 100;
 float dt = 1; // seconds per frame
 float time = 0;
-float coefficientOfFriction = 0.5f;
 
 Vector2 launchPos;
 
-Vector2 velocity; 
+Vector2 velocity;
 
 Vector2 gravityAcceleration = { 0, 100 };
 float launchAngle;
@@ -36,20 +35,11 @@ class PhysicsBody
 {
 public:
     bool isStatic = false; // If this is set to true, don't move the object according to velocity or gravity
-    Vector2 position {};
-    Vector2 projectileVelo {}; // Pixels per sec
-    Color color = GREEN;
+    Vector2 position{};
+    Vector2 projectileVelo{}; // Pixels per sec
     Vector2 netForce = {}; // in Newtons
     float mass = 1;
-
-    // Projectile Specific Physics
-    void update(float dt, Vector2 gravity)
-    {
-        if (isStatic) return;
-
-        position += projectileVelo * dt;
-        projectileVelo += gravity * dt;
-    }
+    float coefficientOfFriction = 0.5f;
 
     virtual void draw() {}
 
@@ -59,10 +49,13 @@ public:
 class PhysicsCircle : public PhysicsBody
 {
 public:
+    Color color = GREEN;
     float radius = 30.0f;
+    float timer = 0.0f;
     void draw() override
     {
         DrawCircleV(position, radius, color);
+        DrawText(TextFormat("0.0", timer), position.x - 14, position.y - 12, 25, BLACK);
     }
 
     PhysicsShape Shape() override
@@ -111,7 +104,7 @@ public:
         //    Vector2 oppositeVec = normal * -offset;
         //    DrawLineEx(position - parallelToSurface * 2000 + oppositeVec, position + parallelToSurface * 2000 + oppositeVec, 50, DARKGREEN);
         //}
-        
+
         DrawLineEx(position - parallelToSurface * 2000, position + parallelToSurface * 2000, 1, RED);
     }
 
@@ -123,9 +116,9 @@ public:
 
 std::vector<PhysicsBody*> objects;
 PhysicsHalfspace halfspace;
-PhysicsHalfspace halfspace2;
+//PhysicsHalfspace halfspace2;
 
-bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace) 
+bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
 {
     Vector2 displacementToCircle = circle->position - halfspace->position;
 
@@ -146,24 +139,31 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
         // Get Gravity
         Vector2 FGravity = gravityAcceleration * circle->mass;
 
+        // Perp Magnitude
+        float FPerpMagnitude = Vector2DotProduct(circle->netForce, halfspace->getNormal());
         // Apply Normal Force
-        Vector2 FgPerp = halfspace->getNormal() * Vector2DotProduct(FGravity, halfspace->getNormal());
+        Vector2 FgPerp = halfspace->getNormal() * FPerpMagnitude;
         Vector2 FNormal = FgPerp * -1;
         circle->netForce += FNormal;
         DrawLineEx(circle->position, circle->position + FNormal, 2, GREEN);
 
         // Friction
         // F = uN where u is coefficient of friction between two surfaces
-        float u = coefficientOfFriction;
+        float u = circle->coefficientOfFriction;
         float frictionMagnitude = Vector2Length(FNormal) * u;
 
-        Vector2 FgPara = FGravity - FgPerp;
-        Vector2 frictionDirection = Vector2Normalize(FgPara) * -1;
+        Vector2 FPerp = Vector2Rotate(halfspace->getNormal(), PI * 0.5f);
 
-        Vector2 Ffriction = frictionDirection * frictionMagnitude;
+        float vFPerp = Vector2DotProduct(circle->projectileVelo, FPerp);
 
-        circle->netForce += Ffriction;
-        DrawLineEx(circle->position, circle->position + Ffriction, 2, PINK);
+        if (fabs(vFPerp) > 0.01)
+        {
+            Vector2 frictionDirection = (vFPerp > 0 ? Vector2Negate(FPerp) : FPerp);
+            Vector2 Ffriction = frictionDirection * frictionMagnitude;
+
+            circle->netForce += Ffriction;
+            DrawLineEx(circle->position, circle->position + Ffriction, 2, ORANGE);
+        }
 
         return true;
     }
@@ -178,7 +178,7 @@ bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
     float sumOfRadii = circleA->radius + circleB->radius;
 
     float overlapCircle = sumOfRadii - distance;
-   
+
     if (overlapCircle > 0)
     {
         Vector2 normaltAtoB;
@@ -190,7 +190,7 @@ bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
         {
             normaltAtoB = displacement / distance;
         }
-        
+
         normaltAtoB = displacement / distance;
         Vector2 mtv = normaltAtoB * overlapCircle; // minimum translation vector. Shortest distance/direction needed to move circles
 
@@ -207,10 +207,10 @@ bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
 
 void checkCollisions()
 {
-    for (int i = 0; i < objects.size(); i++) // Resets all circles to green if not touching
-    {
-        objects[i]->color = GREEN;
-    }
+    //for (int i = 0; i < objects.size(); i++) // Resets all circles to green if not touching
+    //{
+    //    objects[i]->color = GREEN;
+    //}
 
     for (int i = 0; i < objects.size(); i++) // Overlap check
     {
@@ -239,8 +239,8 @@ void checkCollisions()
 
             if (didOverlap)
             {
-                objectPointerA->color = RED;
-                objectPointerB->color = RED;
+                //objectPointerA->color = RED;
+                //objectPointerB->color = RED;
             }
         }
     }
@@ -263,11 +263,8 @@ void cleanup()
 
 void addGravityForce()
 {
-    // Adds physics to all angry birds created
     for (int i = 0; i < objects.size(); i++)
     {
-        objects[i]->update(dt, gravityAcceleration);
-
         if (objects[i]->isStatic) continue;
 
         Vector2 FGravity = gravityAcceleration * objects[i]->mass; // F = ma therefore Fg = object mass * accleration due to gravity
@@ -302,6 +299,19 @@ void addKinematics()
     }
 }
 
+void spawnCircle(Vector2 spawnLocation, float mass, float friction, Color color)
+{
+    // Creates and allocates memory for a new circle
+    PhysicsCircle* newCircle = new PhysicsCircle();
+    newCircle->position = spawnLocation;
+    newCircle->mass = mass;
+    newCircle->coefficientOfFriction = friction;
+    newCircle->projectileVelo = velocity;
+    newCircle->color = color;
+    objects.push_back(newCircle);
+    // Adds a new circle to the list
+}
+
 void update()
 {
     dt = 1.0f / TARGET_FPS;
@@ -321,12 +331,23 @@ void update()
     // Spawn launch bird
     if (IsKeyPressed(KEY_SPACE))
     {
-        // Creates and allocates memory for a new bird
-        PhysicsCircle* newCircle = new PhysicsCircle();
-        newCircle->position = launchPos;
-        newCircle->projectileVelo = velocity;
-        objects.push_back(newCircle); 
-        // Adds a new bird to the list
+        spawnCircle(launchPos, 1, 0.5f, GREEN);
+    }
+    if (IsKeyPressed(KEY_ONE))
+    {
+        spawnCircle(launchPos, 2, 0.1f, RED);
+    }
+    if (IsKeyPressed(KEY_TWO))
+    {
+        spawnCircle(launchPos, 2, 0.8f, GREEN);
+    }
+    if (IsKeyPressed(KEY_THREE))
+    {
+        spawnCircle(launchPos, 8, 0.1f, BLUE);
+    }
+    if (IsKeyPressed(KEY_FOUR))
+    {
+        spawnCircle(launchPos, 8, 0.8f, YELLOW);
     }
 
     resetNetForces();
@@ -343,69 +364,67 @@ void update()
 // Displays the world
 void draw()
 {
-        BeginDrawing();
-            ClearBackground(SKYBLUE);
+    BeginDrawing();
+    ClearBackground(SKYBLUE);
 
-            // Variable Adjustment Sliders
-            GuiSliderBar(Rectangle{ 10, 150, 700, 20 }, "", TextFormat("Angle: %.2f", launchAngle), &launchAngle, 0, 180);
-            GuiSliderBar(Rectangle{ 10, 190, 700, 20 }, "", TextFormat("Speed: %.2f", launchSpeed), &launchSpeed, 0, 500);
-            GuiSliderBar(Rectangle{ 10, 230, 700, 20 }, "", TextFormat("Gravity: %.2f", gravityAcceleration.y), &gravityAcceleration.y, -350, 700);
-            // Halfspace Sliders
-            GuiSliderBar(Rectangle{ 80, 270, 700, 20 }, "Halfspace X", TextFormat("%.0f", halfspace.position.x), &halfspace.position.x, 0, GetScreenWidth());
-            GuiSliderBar(Rectangle{ 80, 310, 700, 20 }, "Halfspace y", TextFormat("%.0f", halfspace.position.y), &halfspace.position.y, 0, GetScreenHeight());
-            float halfspaceRotation = halfspace.getRotation();
-            GuiSliderBar(Rectangle{ 110, 350, 500, 20 }, "Halfspace Rotate", TextFormat("%.0f", halfspaceRotation), &halfspaceRotation, -180, 180);
-            halfspace.setRotationDegrees(halfspaceRotation);
-            //Friction Control
-            GuiSliderBar(Rectangle{ 110, 390, 500, 20 }, "Friction Control", TextFormat("%.0f", coefficientOfFriction), &coefficientOfFriction, 0, 1);
+    // Variable Adjustment Sliders
+    GuiSliderBar(Rectangle{ 10, 150, 700, 20 }, "", TextFormat("Angle: %.2f", launchAngle), &launchAngle, 0, 180);
+    GuiSliderBar(Rectangle{ 10, 190, 700, 20 }, "", TextFormat("Speed: %.2f", launchSpeed), &launchSpeed, 0, 500);
+    GuiSliderBar(Rectangle{ 10, 230, 700, 20 }, "", TextFormat("Gravity: %.2f", gravityAcceleration.y), &gravityAcceleration.y, -350, 700);
+    // Halfspace Sliders
+    GuiSliderBar(Rectangle{ 80, 270, 700, 20 }, "Halfspace X", TextFormat("%.0f", halfspace.position.x), &halfspace.position.x, 0, GetScreenWidth());
+    GuiSliderBar(Rectangle{ 80, 310, 700, 20 }, "Halfspace y", TextFormat("%.0f", halfspace.position.y), &halfspace.position.y, 0, GetScreenHeight());
+    float halfspaceRotation = halfspace.getRotation();
+    GuiSliderBar(Rectangle{ 110, 350, 500, 20 }, "Halfspace Rotate", TextFormat("%.0f", halfspaceRotation), &halfspaceRotation, -180, 180);
+    halfspace.setRotationDegrees(halfspaceRotation);
+    //Friction Control (Might use later idk)
+    //GuiSliderBar(Rectangle{ 110, 390, 500, 20 }, "Friction Control", TextFormat("%.1f", coefficientOfFriction), &coefficientOfFriction, 0, 1);
 
-            // Ground (May be adding it back later)
-            //DrawRectangle(0, 700, 1200, 100, DARKGREEN);
-            // Text Box
-            DrawRectangle(10, 30, 280, 100, BLACK);
-            DrawRectangle(310, 30, 280, 100, BLACK);
-            DrawRectangle(610, 30, 280, 100, BLACK);
-            DrawRectangle(910, 30, 280, 100, BLACK);
-            // Velocity Calculation
-            velocity = { launchSpeed * cosf(rad), -launchSpeed * sinf(rad) };
-            // Creating Line
-            DrawLineEx(launchPos, Vector2{ launchPos + velocity }, 7, RED);
-            // Number of Birds Spawned Text
-            DrawText(TextFormat("Projectiles: %i", objects.size() - 1), 10, 390, 30, WHITE);
-            // Text (In the text box)
-            DrawText("Launch Position", 32, 42, 30, WHITE);
-            DrawText(TextFormat("(%.0f, %.0f)", launchPos.x, launchPos.y), 32, 82, 30, WHITE);
-            DrawText("Launch Angle", 342, 42, 30, WHITE);
-            DrawText(TextFormat("(%.1f Degrees)", launchAngle), 342, 82, 30, WHITE);
-            DrawText("Launch Speed", 642, 42, 30, WHITE);
-            DrawText(TextFormat("(%.1f)", launchSpeed), 642, 82, 30, WHITE);
-            DrawText("Gravitational Pull", 919, 42, 30, WHITE);
-            DrawText(TextFormat("(%.1f)", gravityAcceleration.y), 925, 82, 30, WHITE);
-            // Start Position
-            DrawCircleV(launchPos, 10, RED);
-            // Draws each circle in list
-            for (int i = 0; i < objects.size(); i++)
-            {
-                objects[i]->draw();
-            }
+    // Text Box
+    DrawRectangle(10, 30, 280, 100, BLACK);
+    DrawRectangle(310, 30, 280, 100, BLACK);
+    DrawRectangle(610, 30, 280, 100, BLACK);
+    DrawRectangle(910, 30, 280, 100, BLACK);
+    // Velocity Calculation
+    velocity = { launchSpeed * cosf(rad), -launchSpeed * sinf(rad) };
+    // Creating Line
+    DrawLineEx(launchPos, Vector2{ launchPos + velocity }, 7, RED);
+    // Number of Circles Spawned Text
+    DrawText(TextFormat("Projectiles: %i", objects.size() - 2), 10, 430, 30, WHITE);
+    // Text (In the text box)
+    DrawText("Launch Position", 32, 42, 30, WHITE);
+    DrawText(TextFormat("(%.0f, %.0f)", launchPos.x, launchPos.y), 32, 82, 30, WHITE);
+    DrawText("Launch Angle", 342, 42, 30, WHITE);
+    DrawText(TextFormat("(%.1f Degrees)", launchAngle), 342, 82, 30, WHITE);
+    DrawText("Launch Speed", 642, 42, 30, WHITE);
+    DrawText(TextFormat("(%.1f)", launchSpeed), 642, 82, 30, WHITE);
+    DrawText("Gravitational Pull", 919, 42, 30, WHITE);
+    DrawText(TextFormat("(%.1f)", gravityAcceleration.y), 925, 82, 30, WHITE);
+    // Start Position
+    DrawCircleV(launchPos, 10, RED);
+    // Draws each circle in list
+    for (int i = 0; i < objects.size(); i++)
+    {
+        objects[i]->draw();
+    }
 
-            // Draw Free Body Diagram
-            //Vector2 location = { (InitialWidth / 2), (InitialHeight / 2)};
-            //DrawCircleLines(location.x, location.y, 100, WHITE);
-            //float mass = 8;
-            //// Draw Gravity
-            //Vector2 FGravity = gravityAcceleration * mass;
-            //DrawLineEx(location, location + FGravity, 3, PURPLE);
-            //// Draw Normal Force
-            //Vector2 FgPerp = halfspace.getNormal() * Vector2DotProduct(FGravity, halfspace.getNormal());
-            //Vector2 FNormal = FgPerp * -1;
-            //DrawLineEx(location, location + FNormal, 3, GREEN);
-            //// Draw Friction
-            //Vector2 FgPara = FGravity - FgPerp;
-            //Vector2 Ffriction = FgPara * -1;
-            //DrawLineEx(location, location + Ffriction, 3, ORANGE);
+    // Draw Free Body Diagram
+    //Vector2 location = { (InitialWidth / 2), (InitialHeight / 2)};
+    //DrawCircleLines(location.x, location.y, 100, WHITE);
+    //float mass = 8;
+    //// Draw Gravity
+    //Vector2 FGravity = gravityAcceleration * mass;
+    //DrawLineEx(location, location + FGravity, 3, PURPLE);
+    //// Draw Normal Force
+    //Vector2 FgPerp = halfspace.getNormal() * Vector2DotProduct(FGravity, halfspace.getNormal());
+    //Vector2 FNormal = FgPerp * -1;
+    //DrawLineEx(location, location + FNormal, 3, GREEN);
+    //// Draw Friction
+    //Vector2 FgPara = FGravity - FgPerp;
+    //Vector2 Ffriction = FgPara * -1;
+    //DrawLineEx(location, location + Ffriction, 3, ORANGE);
 
-        EndDrawing();
+    EndDrawing();
 }
 
 int main()
@@ -413,12 +432,12 @@ int main()
     InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 9");
     SetTargetFPS(TARGET_FPS);
     halfspace.isStatic = true;
-    halfspace2.isStatic = true;
+    //halfspace2.isStatic = true;
     halfspace.position = { 500, 700 };
-    halfspace2.position = { 700, 750 };
+    //halfspace2.position = { 700, 750 };
     objects.push_back(&halfspace);
-    objects.push_back(&halfspace2);
-    halfspace2.setRotationDegrees(15);
+    //objects.push_back(&halfspace2);
+    //halfspace2.setRotationDegrees(15);
 
     launchPos = { 200.0f, 700.0f };
     launchAngle = 50.0f;
@@ -426,8 +445,8 @@ int main()
 
     while (!WindowShouldClose()) // Loops TARGET_FPS per second
     {
-        draw();
         update();
+        draw();
     }
 
     CloseWindow();
