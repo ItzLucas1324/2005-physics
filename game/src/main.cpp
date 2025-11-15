@@ -52,10 +52,12 @@ public:
     Color color = GREEN;
     float radius = 30.0f;
     float timer = 0.0f;
+    bool isTimerActive = true;
+
     void draw() override
     {
         DrawCircleV(position, radius, color);
-        DrawText(TextFormat("0.0", timer), position.x - 14, position.y - 12, 25, BLACK);
+        DrawText(TextFormat("%.1f", timer), position.x - 14, position.y - 12, 25, BLACK);
     }
 
     PhysicsShape Shape() override
@@ -73,6 +75,8 @@ private:
     Vector2 normal = { 0, -1 };
 
 public:
+
+    int id = 0;
 
     void setRotationDegrees(float rotationInDeg)
     {
@@ -116,7 +120,7 @@ public:
 
 std::vector<PhysicsBody*> objects;
 PhysicsHalfspace halfspace;
-//PhysicsHalfspace halfspace2;
+PhysicsHalfspace halfspace2;
 
 bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
 {
@@ -133,6 +137,11 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
 
     if (overlapHalfspace > 0)
     {
+        if (halfspace->id == 2)
+        {
+            circle->isTimerActive = false;
+        }
+
         Vector2 mtv = halfspace->getNormal() * overlapHalfspace;
         circle->position += mtv;
 
@@ -250,11 +259,16 @@ void cleanup()
 {
     for (int i = 0; i < objects.size(); i++)
     {
-        if (objects[i]->position.y > GetScreenHeight())
+        PhysicsBody* obj = objects[i];
+
+        if (obj->isStatic) continue;
+
+        if (obj->Shape() == CIRCLE && obj->position.y > GetScreenHeight() || IsKeyDown(KEY_BACKSPACE))
         {
             auto iterator = (objects.begin() + i);
-            PhysicsBody* pointer = *iterator;
-            delete pointer;
+                      
+            delete obj;
+
             objects.erase(iterator);
             i--;
         }
@@ -286,6 +300,12 @@ void addKinematics()
     for (int i = 0; i < objects.size(); i++)
     {
         if (objects[i]->isStatic) continue;
+
+        PhysicsCircle* circle = dynamic_cast<PhysicsCircle*>(objects[i]);
+        if (circle && circle->isTimerActive)
+        {
+            circle->timer += dt;
+        }
 
         objects[i]->position = objects[i]->position + objects[i]->projectileVelo * dt;
 
@@ -432,12 +452,15 @@ int main()
     InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 9");
     SetTargetFPS(TARGET_FPS);
     halfspace.isStatic = true;
-    //halfspace2.isStatic = true;
-    halfspace.position = { 500, 700 };
-    //halfspace2.position = { 700, 750 };
+    halfspace.id = 1;
+    halfspace.position = { 240, 500 };
     objects.push_back(&halfspace);
-    //objects.push_back(&halfspace2);
-    //halfspace2.setRotationDegrees(15);
+    halfspace.setRotationDegrees(40);
+
+    halfspace2.isStatic = true;
+    halfspace2.id = 2;
+    halfspace2.position = { 700, 725 };
+    objects.push_back(&halfspace2);
 
     launchPos = { 200.0f, 700.0f };
     launchAngle = 50.0f;
