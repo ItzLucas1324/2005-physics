@@ -1,8 +1,3 @@
-/*
-This project uses the Raylib framework to provide us functionality for math, graphics, GUI, input etc.
-See documentation here: https://www.raylib.com/, and examples here: https://www.raylib.com/examples.html
-*/
-
 #include "raylib.h"
 #include "raymath.h"
 #define RAYGUI_IMPLEMENTATION
@@ -149,7 +144,7 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
         Vector2 FGravity = gravityAcceleration * circle->mass;
 
         // Perp Magnitude
-        float FPerpMagnitude = Vector2DotProduct(circle->netForce, halfspace->getNormal());
+        float FPerpMagnitude = Vector2DotProduct(FGravity, halfspace->getNormal());
         // Apply Normal Force
         Vector2 FgPerp = halfspace->getNormal() * FPerpMagnitude;
         Vector2 FNormal = FgPerp * -1;
@@ -161,19 +156,25 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
         float u = circle->coefficientOfFriction;
         float frictionMagnitude = Vector2Length(FNormal) * u;
 
-        Vector2 FPerp = Vector2Rotate(halfspace->getNormal(), PI * 0.5f);
+        Vector2 FPara = Vector2Rotate(halfspace->getNormal(), -PI * 0.5f);
 
-        float vFPerp = Vector2DotProduct(circle->projectileVelo, FPerp);
+        float vFPara = Vector2DotProduct(circle->projectileVelo, FPara);
 
-        if (fabs(vFPerp) > 0.01)
+        const float veloctiyThreshold = 5.0f;
+
+        if (fabs(vFPara) > veloctiyThreshold)
         {
-            Vector2 frictionDirection = (vFPerp > 0 ? Vector2Negate(FPerp) : FPerp);
+            Vector2 frictionDirection = (vFPara > 0 ? Vector2Negate(FPara) : FPara);
             Vector2 Ffriction = frictionDirection * frictionMagnitude;
-
             circle->netForce += Ffriction;
             DrawLineEx(circle->position, circle->position + Ffriction, 2, ORANGE);
         }
-
+        else
+        {
+            Vector2 velAlongSurface = FPara * vFPara;
+            circle->projectileVelo -= velAlongSurface;
+        }
+        
         return true;
     }
     else
@@ -316,6 +317,10 @@ void addKinematics()
         // Drawing netforces
 
         DrawLineEx(objects[i]->position, objects[i]->position + objects[i]->netForce, 3, PINK);
+
+        // Draw gravity force 
+        Vector2 FGravity = gravityAcceleration * objects[i]->mass;
+        DrawLineEx(objects[i]->position, objects[i]->position + FGravity, 2, PURPLE);
     }
 }
 
@@ -449,13 +454,13 @@ void draw()
 
 int main()
 {
-    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 9");
+    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 11");
     SetTargetFPS(TARGET_FPS);
     halfspace.isStatic = true;
     halfspace.id = 1;
     halfspace.position = { 240, 500 };
     objects.push_back(&halfspace);
-    halfspace.setRotationDegrees(40);
+    halfspace.setRotationDegrees(50);
 
     halfspace2.isStatic = true;
     halfspace2.id = 2;
