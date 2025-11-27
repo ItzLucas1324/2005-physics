@@ -20,6 +20,8 @@ float launchAngle;
 float launchSpeed;
 float rad;
 
+float circleMass = 1.0f;
+
 enum PhysicsShape
 {
     CIRCLE,
@@ -35,6 +37,7 @@ public:
     Vector2 netForce = {}; // in Newtons
     float mass = 1;
     float coefficientOfFriction = 0.5f;
+    float bounciness = 0.9f; // for determing coefficient of restitution
 
     virtual void draw() {}
 
@@ -46,13 +49,13 @@ class PhysicsCircle : public PhysicsBody
 public:
     Color color = GREEN;
     float radius = 30.0f;
-    float timer = 0.0f;
+    //float timer = 0.0f;
     bool isTimerActive = true;
 
     void draw() override
     {
         DrawCircleV(position, radius, color);
-        DrawText(TextFormat("%.1f", timer), position.x - 14, position.y - 12, 25, BLACK);
+        DrawText(TextFormat("%.1f", mass), position.x - 14, position.y - 12, 25, BLACK);
     }
 
     PhysicsShape Shape() override
@@ -115,7 +118,7 @@ public:
 
 std::vector<PhysicsBody*> objects;
 PhysicsHalfspace halfspace;
-PhysicsHalfspace halfspace2;
+//PhysicsHalfspace halfspace2;
 
 bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
 {
@@ -132,10 +135,10 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
 
     if (overlapHalfspace > 0)
     {
-        if (halfspace->id == 2)
-        {
-            circle->isTimerActive = false;
-        }
+        //if (halfspace->id == 2)
+        //{
+        //    circle->isTimerActive = false;
+        //}
 
         Vector2 mtv = halfspace->getNormal() * overlapHalfspace;
         circle->position += mtv;
@@ -174,6 +177,17 @@ bool HalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
             Vector2 velAlongSurface = FPara * vFPara;
             circle->projectileVelo -= velAlongSurface;
         }
+
+        // Bouncing!
+        // From perspective of A
+        //Vector2 velocityBRelativeToA = circleB->projectileVelo - circleA->projectileVelo;
+        float closingVelocity = Vector2DotProduct(circle->projectileVelo, halfspace->getNormal());
+
+        // If is negative then we are colliding. If positive not colliding
+        if (closingVelocity >= 0) return true;
+
+        float restitution = circle->bounciness * halfspace->bounciness;
+        circle->projectileVelo += halfspace->getNormal() * closingVelocity * -(1.0f + restitution);
         
         return true;
     }
@@ -189,23 +203,43 @@ bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
 
     float overlapCircle = sumOfRadii - distance;
 
-    if (overlapCircle > 0)
+    if (overlapCircle >= 0)
     {
-        Vector2 normaltAtoB;
+        Vector2 normalAtoB;
         if (abs(distance) < 0.001f)
         {
-            normaltAtoB = { 0, 1 };
+            normalAtoB = { 0, 1 };
         }
         else
         {
-            normaltAtoB = displacement / distance;
+            normalAtoB = displacement / distance;
         }
 
-        normaltAtoB = displacement / distance;
-        Vector2 mtv = normaltAtoB * overlapCircle; // minimum translation vector. Shortest distance/direction needed to move circles
+        normalAtoB = displacement / distance;
+        Vector2 mtv = normalAtoB * overlapCircle; // minimum translation vector. Shortest distance/direction needed to move circles
 
         circleA->position -= mtv * 0.5;
         circleB->position += mtv * 0.5;
+
+        // From perspective of A
+        Vector2 velocityBRelativeToA = circleB->projectileVelo - circleA->projectileVelo;
+        float closingVelocity = Vector2DotProduct(velocityBRelativeToA, normalAtoB);
+
+        // If is negative then we are colliding. If positive not colliding
+        if (closingVelocity >= 0) return true;
+        
+        float restitution = circleA->bounciness * circleB->bounciness;
+
+        float totalMass = circleA->mass + circleB->mass;
+        float impulseMagnitude = ((1.0f + restitution) * closingVelocity * circleA->mass * circleB->mass) / totalMass;
+        // A -->  <-- B
+        Vector2 impulseForB = normalAtoB * -impulseMagnitude;
+        Vector2 impulseForA = normalAtoB * impulseMagnitude;
+
+        // Apply impulse
+        circleA->projectileVelo += impulseForA / circleA->mass;
+        circleB->projectileVelo += impulseForB / circleB->mass;
+
         return true; // Overlapping
     }
     else
@@ -303,10 +337,10 @@ void addKinematics()
         if (objects[i]->isStatic) continue;
 
         PhysicsCircle* circle = dynamic_cast<PhysicsCircle*>(objects[i]);
-        if (circle && circle->isTimerActive)
-        {
-            circle->timer += dt;
-        }
+        //if (circle && circle->isTimerActive)
+        //{
+        //    circle->timer += dt;
+        //}
 
         objects[i]->position = objects[i]->position + objects[i]->projectileVelo * dt;
 
@@ -356,23 +390,12 @@ void update()
     // Spawn launch bird
     if (IsKeyPressed(KEY_SPACE))
     {
-        spawnCircle(launchPos, 1, 0.5f, GREEN);
+        spawnCircle(launchPos, circleMass, 0.5f, GREEN);
     }
     if (IsKeyPressed(KEY_ONE))
     {
-        spawnCircle(launchPos, 2, 0.1f, RED);
-    }
-    if (IsKeyPressed(KEY_TWO))
-    {
-        spawnCircle(launchPos, 2, 0.8f, GREEN);
-    }
-    if (IsKeyPressed(KEY_THREE))
-    {
-        spawnCircle(launchPos, 8, 0.1f, BLUE);
-    }
-    if (IsKeyPressed(KEY_FOUR))
-    {
-        spawnCircle(launchPos, 8, 0.8f, YELLOW);
+        spawnCircle({600, 400}, circleMass, 0.5f, RED);
+        spawnCircle({600, 430}, circleMass * 2, 0.5f, BLUE);
     }
 
     resetNetForces();
@@ -404,6 +427,7 @@ void draw()
     halfspace.setRotationDegrees(halfspaceRotation);
     //Friction Control (Might use later idk)
     //GuiSliderBar(Rectangle{ 110, 390, 500, 20 }, "Friction Control", TextFormat("%.1f", coefficientOfFriction), &coefficientOfFriction, 0, 1);
+    GuiSliderBar(Rectangle{ 900, 150, 250, 20 }, "Circle Mass", TextFormat("%.1f", circleMass), &circleMass, 1, 10);
 
     // Text Box
     DrawRectangle(10, 30, 280, 100, BLACK);
@@ -415,7 +439,7 @@ void draw()
     // Creating Line
     DrawLineEx(launchPos, Vector2{ launchPos + velocity }, 7, RED);
     // Number of Circles Spawned Text
-    DrawText(TextFormat("Projectiles: %i", objects.size() - 2), 10, 430, 30, WHITE);
+    DrawText(TextFormat("Projectiles: %i", objects.size() - 1), 10, 400, 30, WHITE);
     // Text (In the text box)
     DrawText("Launch Position", 32, 42, 30, WHITE);
     DrawText(TextFormat("(%.0f, %.0f)", launchPos.x, launchPos.y), 32, 82, 30, WHITE);
@@ -458,18 +482,17 @@ int main()
     SetTargetFPS(TARGET_FPS);
     halfspace.isStatic = true;
     halfspace.id = 1;
-    halfspace.position = { 240, 500 };
+    halfspace.position = { 600, 700 };
     objects.push_back(&halfspace);
-    halfspace.setRotationDegrees(50);
 
-    halfspace2.isStatic = true;
-    halfspace2.id = 2;
-    halfspace2.position = { 700, 725 };
-    objects.push_back(&halfspace2);
+    //halfspace2.isStatic = true;
+    //halfspace2.id = 2;
+    //halfspace2.position = { 700, 725 };
+    //objects.push_back(&halfspace2);
 
     launchPos = { 200.0f, 700.0f };
     launchAngle = 50.0f;
-    launchSpeed = 350.0f;
+    launchSpeed = 0.0f;
 
     while (!WindowShouldClose()) // Loops TARGET_FPS per second
     {
