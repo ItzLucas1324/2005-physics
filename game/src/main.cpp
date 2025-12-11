@@ -21,11 +21,13 @@ float launchSpeed;
 float rad;
 
 float circleMass = 1.0f;
+int currentBirdType = 1;
 
 enum PhysicsShape
 {
     CIRCLE,
-    HALF_SPACE
+    HALF_SPACE,
+    BLOCK
 };
 
 class PhysicsBody
@@ -113,6 +115,31 @@ public:
     PhysicsShape Shape() override
     {
         return HALF_SPACE;
+    }
+};
+
+class PhysicsBlock : public PhysicsBody
+{
+public:
+    Vector2 halfExtents = { 20, 20 };
+    Color color = BROWN;
+    bool isBird = false;
+
+    void draw() override
+    {
+        float left = position.x - halfExtents.x;
+        float top = position.y - halfExtents.y;
+
+        DrawRectangle(left, top, halfExtents.x * 2, halfExtents.y * 2, color);
+
+        DrawRectangleLines(left, top, halfExtents.x * 2, halfExtents.y * 2, BLACK);
+
+        DrawText(TextFormat("%.1f", mass), position.x - 14, position.y - 12, 25, WHITE);
+    }
+
+    PhysicsShape Shape() override 
+    { 
+        return BLOCK; 
     }
 };
 
@@ -249,6 +276,124 @@ bool CircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
     // normalize displacement vector and multiply it by overlapping distance
 }
 
+bool BlockOverlap(PhysicsBlock* A, PhysicsBlock* B)
+{
+    Vector2 delta = B->position - A->position;
+
+    float overlapX = (A->halfExtents.x + B->halfExtents.x) - fabsf(delta.x);
+    if (overlapX <= 0) return false;
+
+    float overlapY = (A->halfExtents.y + B->halfExtents.y) - fabsf(delta.y);
+    if (overlapY <= 0) return false;
+
+    Vector2 mtv = { 0, 0 };
+    Vector2 normal = { 0, 0 };
+
+    if (overlapX < overlapY)
+    {
+        mtv.x = (delta.x > 0 ? overlapX : -overlapX);
+        normal.x = (delta.x > 0 ? 1.0f : -1.0f);
+    }
+    else
+    {
+        mtv.y = (delta.y > 0 ? overlapY : -overlapY);
+        normal.y = (delta.y > 0 ? 1.0f : -1.0f);
+    }
+
+    float invA = (A->isStatic || A->mass <= 0.0f) ? 0.0f : 1.0f / A->mass;
+    float invB = (B->isStatic || B->mass <= 0.0f) ? 0.0f : 1.0f / B->mass;
+    float invSum = invA + invB;
+
+    if (invSum > 0.0f)
+    {
+        float shareA = invA / invSum;
+        float shareB = invB / invSum;
+
+        A->position -= mtv * shareA;
+        B->position += mtv * shareB;
+    }
+
+    Vector2 relVel = B->projectileVelo - A->projectileVelo;
+    float closingVel = Vector2DotProduct(relVel, normal);
+
+    if (closingVel >= 0.0f || invSum <= 0.0f)
+        return true;
+
+    float restitution = A->bounciness * B->bounciness;
+
+    float j = -(1.0f + restitution) * closingVel / invSum;
+    Vector2 impulse = normal * j;
+
+    if (invA > 0.0f)
+        A->projectileVelo -= impulse * invA;
+    if (invB > 0.0f)
+        B->projectileVelo += impulse * invB;
+
+    return true;
+}
+
+
+bool CircleBlockOverlap(PhysicsCircle* C, PhysicsBlock* B)
+{
+    float minX = B->position.x - B->halfExtents.x;
+    float maxX = B->position.x + B->halfExtents.x;
+    float minY = B->position.y - B->halfExtents.y;
+    float maxY = B->position.y + B->halfExtents.y;
+
+    Vector2 closestPoint = {
+        fmaxf(minX, fminf(C->position.x, maxX)),
+        fmaxf(minY, fminf(C->position.y, maxY))
+    };
+
+    Vector2 diff = C->position - closestPoint;
+    float dist = Vector2Length(diff);
+
+    Vector2 normal;
+    float overlap;
+
+    if (dist < 0.001f)
+    {
+        float dx = fminf(C->position.x - minX, maxX - C->position.x);
+        float dy = fminf(C->position.y - minY, maxY - C->position.y);
+
+        if (dx < dy) normal = { (C->position.x < B->position.x) ? -1.f : 1.f, 0.f };
+        else         normal = { 0.f, (C->position.y < B->position.y) ? -1.f : 1.f };
+
+        overlap = C->radius + fminf(dx, dy);
+    }
+    else
+    {
+        normal = diff / dist;
+        overlap = C->radius - dist;
+        if (overlap <= 0) return false;
+    }
+
+    Vector2 mtv = normal * overlap;
+
+    float invC = (!C->isStatic && C->mass > 0) ? 1.f / C->mass : 0.f;
+    float invB = (!B->isStatic && B->mass > 0) ? 1.f / B->mass : 0.f;
+    float invSum = invC + invB;
+
+    if (invSum > 0)
+    {
+        C->position += mtv * (invC / invSum);
+        B->position -= mtv * (invB / invSum);
+    }
+
+    Vector2 relVel = C->projectileVelo - B->projectileVelo;
+    float closingVel = Vector2DotProduct(relVel, normal);
+    if (closingVel >= 0) return true;
+
+    float restitution = C->bounciness * B->bounciness;
+    float j = -(1.f + restitution) * closingVel / invSum;
+    Vector2 impulse = normal * j;
+
+    if (invC > 0) C->projectileVelo += impulse * invC;
+    if (invB > 0) B->projectileVelo -= impulse * invB;
+
+    return true;
+}
+
 void checkCollisions()
 {
     //for (int i = 0; i < objects.size(); i++) // Resets all circles to green if not touching
@@ -280,6 +425,18 @@ void checkCollisions()
             {
                 didOverlap = (HalfspaceOverlap((PhysicsCircle*)objectPointerB, (PhysicsHalfspace*)objectPointerA));
             }
+            else if (shapeOfA == BLOCK && shapeOfB == BLOCK)
+            {
+                didOverlap = (BlockOverlap((PhysicsBlock*)objectPointerA, (PhysicsBlock*)objectPointerB));
+            }
+            else if (shapeOfA == BLOCK && shapeOfB == CIRCLE)
+            {
+                didOverlap = (CircleBlockOverlap((PhysicsCircle*)objectPointerB, (PhysicsBlock*)objectPointerA));
+            }
+            else if (shapeOfA == CIRCLE && shapeOfB == BLOCK)
+            {
+                didOverlap = (CircleBlockOverlap((PhysicsCircle*)objectPointerA, (PhysicsBlock*)objectPointerB));
+            }
 
             if (didOverlap)
             {
@@ -296,16 +453,22 @@ void cleanup()
     {
         PhysicsBody* obj = objects[i];
 
-        if (obj->isStatic) continue;
+        if (obj->isStatic && obj->Shape() == HALF_SPACE) continue;
 
-        if (obj->Shape() == CIRCLE && obj->position.y > GetScreenHeight() || IsKeyDown(KEY_BACKSPACE))
+        if (obj->Shape() == CIRCLE && (obj->position.y > GetScreenHeight() || IsKeyDown(KEY_BACKSPACE)))
         {
-            auto iterator = (objects.begin() + i);
-                      
             delete obj;
-
-            objects.erase(iterator);
+            objects.erase(objects.begin() + i);
             i--;
+            continue;
+        }
+
+        if (obj->Shape() == BLOCK && obj->position.y > GetScreenHeight())
+        {
+            delete obj;
+            objects.erase(objects.begin() + i);
+            i--;
+            continue;
         }
     }
 }
@@ -371,11 +534,28 @@ void spawnCircle(Vector2 spawnLocation, float mass, float friction, Color color)
     // Adds a new circle to the list
 }
 
+void spawnBlock(Vector2 pos)
+{
+    PhysicsBlock* newBlock = new PhysicsBlock();
+    newBlock->position = pos;
+    newBlock->halfExtents = { 30, 30 };
+    newBlock->color = BLACK;
+    newBlock->mass = circleMass;
+    newBlock->projectileVelo = velocity;
+    objects.push_back(newBlock);
+}
+
 void update()
 {
     dt = 1.0f / TARGET_FPS;
     time += dt;
     rad = launchAngle * DEG2RAD;
+
+    if (IsKeyPressed(KEY_ONE))
+        currentBirdType = 1;
+
+    if (IsKeyPressed(KEY_TWO))
+        currentBirdType = 2;
 
     // Start Position Movement
     if (IsKeyDown(KEY_W))
@@ -390,12 +570,10 @@ void update()
     // Spawn launch bird
     if (IsKeyPressed(KEY_SPACE))
     {
-        spawnCircle(launchPos, circleMass, 0.5f, GREEN);
-    }
-    if (IsKeyPressed(KEY_ONE))
-    {
-        spawnCircle({600, 400}, circleMass, 0.5f, RED);
-        spawnCircle({600, 430}, circleMass * 2, 0.5f, BLUE);
+        if (currentBirdType == 1)
+            spawnCircle(launchPos, circleMass, 0.5f, GREEN);
+        if (currentBirdType == 2)
+            spawnBlock(launchPos);
     }
 
     resetNetForces();
@@ -407,6 +585,34 @@ void update()
     addKinematics();
 
     cleanup();
+}
+
+void spawnAABBTower()
+{
+    float x = 800;          // tower horizontal position
+    float baseY = 650;      // height of the ground
+    float blockSize = 30;   // half extents of block
+    int numBlocks = 5;      // height of tower
+
+    for (int i = 0; i < numBlocks; i++)
+    {
+        PhysicsBlock* block = new PhysicsBlock();
+
+        block->halfExtents = { blockSize, blockSize };
+
+        if (i == 0)
+        {
+            block->halfExtents = { blockSize * 10, blockSize };
+            block->isStatic = true;
+        }
+
+        block->position = { x, baseY - i * (block->halfExtents.y * 2 + 2) };
+        block->color = BROWN;
+        block->mass = 5;
+        block->projectileVelo = { 0,0 };
+
+        objects.push_back(block);
+    }
 }
 
 // Displays the world
@@ -485,10 +691,7 @@ int main()
     halfspace.position = { 600, 700 };
     objects.push_back(&halfspace);
 
-    //halfspace2.isStatic = true;
-    //halfspace2.id = 2;
-    //halfspace2.position = { 700, 725 };
-    //objects.push_back(&halfspace2);
+    spawnAABBTower();
 
     launchPos = { 200.0f, 700.0f };
     launchAngle = 50.0f;
