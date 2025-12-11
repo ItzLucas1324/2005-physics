@@ -684,7 +684,7 @@ void draw()
 
 int main()
 {
-    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 11");
+    InitWindow(InitialWidth, InitialHeight, "Lucas Adda 101566961 2005 Week 15");
     SetTargetFPS(TARGET_FPS);
     halfspace.isStatic = true;
     halfspace.id = 1;
